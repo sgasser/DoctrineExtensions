@@ -594,9 +594,16 @@ class TranslatableListener extends MappedEventSubscriber
         $changeSet = $ea->getObjectChangeSet($uow, $object);
         $translatableFields = $config['fields'];
         foreach ($translatableFields as $field) {
+            // Hack to write same content as original locale
+            $content = $ea->getTranslationValue($object, $field);
+            $getter = 'get'.ucfirst($field);
+            $sameContentAsOriginal = false;
+            if (method_exists($object, $getter) && $object->$getter() === $content) {
+                $sameContentAsOriginal = true;
+            }
             $wasPersistedSeparetely = false;
             $skip = isset($this->translatedInLocale[$oid]) && $locale === $this->translatedInLocale[$oid];
-            $skip = $skip && !isset($changeSet[$field]) && !$this->getTranslationInDefaultLocale($oid, $field);
+            $skip = $skip && !isset($changeSet[$field]) && !$this->getTranslationInDefaultLocale($oid, $field) && !$sameContentAsOriginal;
             if ($skip) {
                 continue; // locale is same and nothing changed
             }
@@ -662,11 +669,10 @@ class TranslatableListener extends MappedEventSubscriber
 
             if ($translation) {
                 // set the translated field, take value using reflection
-                $content = $ea->getTranslationValue($object, $field);
                 $translation->setContent($content);
                 // check if need to update in database
                 $transWrapper = AbstractWrapper::wrap($translation, $om);
-                if (((null === $content && !$isInsert) || is_bool($content) || is_int($content) || (is_string($content) && strlen($content) > 0) || !empty($content)) && ($isInsert || !$transWrapper->getIdentifier() || isset($changeSet[$field]))) {
+                if (((null === $content && !$isInsert) || is_bool($content) || is_int($content) || (is_string($content) && strlen($content) > 0) || !empty($content)) && ($isInsert || !$transWrapper->getIdentifier() || isset($changeSet[$field]) || $sameContentAsOriginal)) {
                     if ($isInsert && !$objectId && !$ea->usesPersonalTranslation($translationClass)) {
                         // if we do not have the primary key yet available
                         // keep this translation in memory to insert it later with foreign key
