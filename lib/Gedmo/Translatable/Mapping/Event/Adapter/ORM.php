@@ -3,6 +3,7 @@
 namespace Gedmo\Translatable\Mapping\Event\Adapter;
 
 use Doctrine\Common\Proxy\Proxy;
+use Doctrine\DBAL\Types\ArrayType;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\Mapping\ClassMetadataInfo;
 use Gedmo\Mapping\Event\Adapter\ORM as BaseAdapterORM;
@@ -254,6 +255,10 @@ final class ORM extends BaseAdapterORM implements TranslatableAdapter
         $wrapped = AbstractWrapper::wrap($object, $em);
         $meta = $wrapped->getMetadata();
         $type = Type::getType($meta->getTypeOfField($field));
+        // UGLY hack to use array as translatable field
+        if ($type instanceof ArrayType && $value === '') {
+            $value = serialize([]);
+        }
         $value = $type->convertToPHPValue($value, $em->getConnection()->getDatabasePlatform());
         $wrapped->setPropertyValue($field, $value);
     }
